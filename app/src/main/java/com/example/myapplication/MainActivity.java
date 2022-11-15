@@ -10,16 +10,15 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
-import com.example.myapplication.HomeAdapter;
-import com.example.myapplication.PostInfo;
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
@@ -28,81 +27,121 @@ import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActiviy";
+    private FirebaseUser firebaseUser;
+    private FirebaseFirestore firebaseFirestore;
+    private CollectionReference collectionReference;
+    private HomeAdapter homeAdapter;
+    private ArrayList<PostInfo> postList;
+    private Util util;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        firebaseUser = FirebaseAuth.getInstance().getCurrentUser();
 
-        if (user == null) {
-//            startJoinActivity();
+        if (firebaseUser == null) {
             myStartActivity(JoinActivity.class);
         } else {
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
-            DocumentReference docRef = db.collection("users").document(user.getUid());
-//            Log.d(TAG, "check docRef" + docRef.toString());
-            docRef.get().addOnCompleteListener((task) -> {
-                if (task.isSuccessful()) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document != null) {
-                        if (document.exists()) {
-                            Log.d(TAG, "DocumentSnapshot data: " + document.getData());
-                        } else {
-                            Log.d(TAG, "No such document");
-                        }
-                    }
-                } else {
-                    Log.d(TAG, "get failed with ", task.getException());
-                }
-            });
-
-            db.collection("posts")
-                    .get()
-                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                            if (task.isSuccessful()) {
-                                ArrayList<PostInfo> postList = new ArrayList<>();
-                                for (QueryDocumentSnapshot document : task.getResult()) {
-                                    Log.d(TAG, document.getId() + " => " + document.getData());
-                                    postList.add(new PostInfo(
-                                            document.getData().get("title").toString(),
-                                            document.getData().get("contents").toString(),
-                                            document.getData().get("publisher").toString(),
-                                            new Date(document.getDate("createdAt").getTime())));
-                                }
-                                RecyclerView recyclerView = findViewById(R.id.recyclerView);
-                                recyclerView.setHasFixedSize(true);
-                                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
-
-                                RecyclerView.Adapter mAdapter = new HomeAdapter(MainActivity.this, postList);
-                                recyclerView.setAdapter(mAdapter);
+            firebaseFirestore = FirebaseFirestore.getInstance();
+            DocumentReference documentReference = firebaseFirestore.collection("users").document(firebaseUser.getUid());
+//            documentReference.get().addOnCompleteListener((task) -> {
+//                if (task.isSuccessful()) {
+//                    DocumentSnapshot document = task.getResult();
+//                    if (document != null) {
+//                        if (document.exists()) {
+//                            Log.d(TAG, "DocumentSnapshot data: " + document.getData());
+//                        } else {
+//                            Log.d(TAG, "No such document");
+//                        }
+//                    }
+//                } else {
+//                    Log.d(TAG, "get failed with ", task.getException());
+//                }
+//            });
+            documentReference.get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                @Override
+                public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                    if (task.isSuccessful()) {
+                        DocumentSnapshot document = task.getResult();
+                        if (document != null) {
+                            if (document.exists()) {
+                                Log.d(TAG, "DocumentSnapshot data: " + document.getData());
                             } else {
-                                Log.d(TAG, "Error getting documents: ", task.getException());
+                                Log.d(TAG, "No such document");
                             }
                         }
-                    });
-//
-//            ArrayList<String> arrayList = new ArrayList<>();
-//            arrayList.add("test1");
-//            arrayList.add("test2");
-//            arrayList.add("test3");
-//
-//            RecyclerView recyclerView = findViewById(R.id.recyclerView);
-//            recyclerView.setHasFixedSize(true);
-//            recyclerView.setLayoutManager(new LinearLayoutManager(this));
-//
-//            RecyclerView.Adapter mAdapter = new HomeAdapter(this, arrayList);
-//            recyclerView.setAdapter(mAdapter);
+                    } else {
+                        Log.d(TAG, "get failed with ", task.getException());
+                    }
+                }
+            });
         }
 
-        //findViewById(R.id.logoutButton).setOnClickListener(onClickListener);
-        findViewById(R.id.floatingActionButton2).setOnClickListener(onClickListener);
+        util = new Util(this);
+        postList = new ArrayList<>();
+        homeAdapter = new HomeAdapter(MainActivity.this, postList);
+        homeAdapter.setOnPostListener(onPostListener);
 
+        RecyclerView recyclerView = findViewById(R.id.recyclerView);
+        findViewById(R.id.floatingActionButton).setOnClickListener(onClickListener);
 
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+        recyclerView.setAdapter(homeAdapter);
     }
+
+    @Override
+    protected void onResume(){
+        super.onResume();
+        postsUpdate();
+    }
+
+//    protected void onResume(){
+//        super.onResume();
+//
+//        if (firebaseUser != null) {
+//            collectionReference = firebaseFirestore.collection("posts");
+//            collectionReference.orderBy("createdAt", Query.Direction.DESCENDING).get()
+//                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+//                        @Override
+//                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+//                            if (task.isSuccessful()) {
+//                                postList = new ArrayList<>();
+//                                for (QueryDocumentSnapshot document : task.getResult()) {
+//                                    Log.d(TAG, document.getId() + " => " + document.getData());
+//                                    postList.add(new PostInfo(
+//                                            document.getData().get("title").toString(),
+//                                            document.getData().get("contents").toString(),
+//                                            document.getData().get("publisher").toString(),
+//                                            new Date(document.getDate("createdAt").getTime()),
+//                                            document.getId()));
+//                                }
+//                                mainAdapter.notifyDataSetChanged();
+//
+//
+//                            } else {
+//                                Log.d(TAG, "Error getting documents: ", task.getException());
+//                            }
+//                        }
+//                    });
+//        }
+//    }
+
+
+    OnPostListener onPostListener = new OnPostListener() {
+        @Override
+        public void onDelete(String id) {
+            postsUpdate();
+        }
+
+        @Override
+        public void onModify(String id) {
+            myStartActivity(WritePostActivity.class, id);
+        }
+    };
+
 
     View.OnClickListener onClickListener = new View.OnClickListener() {
         @Override
@@ -112,29 +151,85 @@ public class MainActivity extends AppCompatActivity {
 //                    FirebaseAuth.getInstance().signOut();
 //                    startJoinActivity();
 //                    break;
-                case R.id.floatingActionButton2:
-                    startWritePostActivity();
+                case R.id.floatingActionButton:
+                    myStartActivity(WritePostActivity.class);
                     break;
             }
         }
     };
+
+    private void postsUpdate(){
+        if (firebaseUser != null) {
+            CollectionReference collectionReference = firebaseFirestore.collection("posts");
+            collectionReference.orderBy("createdAt", Query.Direction.DESCENDING).get()
+                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful()) {
+                                postList.clear();
+                                for (QueryDocumentSnapshot document : task.getResult()) {
+                                    Log.d(TAG, document.getId() + " => " + document.getData());
+                                    postList.add(new PostInfo(
+                                            document.getData().get("title").toString(),
+                                            document.getData().get("contents").toString(),
+                                            document.getData().get("publisher").toString(),
+                                            new Date(document.getDate("createdAt").getTime()),
+                                            document.getId()));
+                                }
+                                homeAdapter.notifyDataSetChanged();
+                            } else {
+                                Log.d(TAG, "Error getting documents: ", task.getException());
+                            }
+                        }
+                    });
+        }
+    }
+
+//    private void postsUpdate(){
+//        if (firebaseUser != null) {
+//            CollectionReference collectionReference = firebaseFirestore.collection("posts");
+//            collectionReference.orderBy("createdAt", Query.Direction.DESCENDING).get()
+//                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+//                        @Override
+//                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+//                            if (task.isSuccessful()) {
+//                                postList.clear();
+//                                for (QueryDocumentSnapshot document : task.getResult()) {
+//                                    Log.d(TAG, document.getId() + " => " + document.getData());
+//                                    postList.add(new PostInfo(
+//                                            document.getData().get("title").toString(),
+//                                            (ArrayList<String>) document.getData().get("contents"),
+//                                            document.getData().get("publisher").toString(),
+//                                            new Date(document.getDate("createdAt").getTime()),
+//                                            document.getId()));
+//                                }
+//                                mainAdapter.notifyDataSetChanged();
+//                            } else {
+//                                Log.d(TAG, "Error getting documents: ", task.getException());
+//                            }
+//                        }
+//                    });
+//        }
+//    }
+
+
 
     private void myStartActivity(Class c) {
         Intent intent = new Intent(this, c);
         startActivity(intent);
     }
 
-
-
-//    private void startJoinActivity() {
-//        Intent intent = new Intent(this, JoinActivity.class);
-//        startActivity(intent);
-//    }
-//
-    private void startWritePostActivity() {
-        Intent intent = new Intent(this, WritePostActivity.class);
+    private void myStartActivity(Class c, String id) {
+        Intent intent = new Intent(this, c);
+        intent.putExtra("id",id);
         startActivity(intent);
     }
+
+//    private void myStartActivity(Class c, PostInfo postInfo) {
+//        Intent intent = new Intent(this, c);
+//        intent.putExtra("postInfo", postInfo);
+//        startActivity(intent);
+//    }
 
 }
 

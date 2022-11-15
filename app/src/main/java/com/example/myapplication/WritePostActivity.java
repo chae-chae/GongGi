@@ -24,6 +24,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Date;
 
@@ -40,9 +41,9 @@ public class WritePostActivity extends AppCompatActivity {
 //    private RelativeLayout loaderLayout; view loader 적용 안함
 //    private ImageView selectedImageVIew;
 //    private EditText selectedEditText;
-//    private EditText contentsEditText;
-//    private EditText titleEditText;
-//    private PostInfo postInfo;
+    private EditText contentsEditText;
+    private EditText titleEditText;
+    private PostInfo postInfo;
     private int pathCount, successCount;
 
 
@@ -54,11 +55,16 @@ public class WritePostActivity extends AppCompatActivity {
         parent = findViewById(R.id.contentsLayout);
         buttonsBackgroundLayout = findViewById(R.id.buttonsBackgroundLayout);
 
-        findViewById(R.id.check).setOnClickListener(onClickListener);
-        findViewById(R.id.image).setOnClickListener(onClickListener);
+//        findViewById(R.id.check).setOnClickListener(onClickListener);
+//        findViewById(R.id.image).setOnClickListener(onClickListener);
+//        buttonsBackgroundLayout.setOnClickListener(onClickListener);
         buttonsBackgroundLayout.setOnClickListener(onClickListener);
+        findViewById(R.id.check).setOnClickListener(onClickListener);
+        findViewById(R.id.delete).setOnClickListener(onClickListener);
 
-//        findViewById(R.id.conten적sEditText).setOnFocusChangeListener(onFocusChangeListner); 여러개선택
+//        postInfo = (PostInfo) getIntent().getSerializableExtra("postInfo");
+
+//        findViewById(R.id.contentsEditText).setOnFocusChangeListener(onFocusChangeListner); 여러개선택
 //        findViewById(R.id.titleEditText).setOnFocusChangeListener(new View.OnFocusChangeListener(){
 //            @Override
 //            public  void onFocusChange(View v,boolean hasFocus){
@@ -84,7 +90,7 @@ public class WritePostActivity extends AppCompatActivity {
     }
 
 
-    // with multiple images
+
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -165,6 +171,10 @@ public class WritePostActivity extends AppCompatActivity {
                         buttonsBackgroundLayout.setVisibility(View.GONE);
                     }
                     break;
+//                case R.id.delete:
+//                    parent.removeView((View)selectedImageVIew.getParent());
+//                    buttonsBackgroundLayout.setVisibility(View.GONE);
+//                    break;
             }
         }
 
@@ -178,42 +188,92 @@ public class WritePostActivity extends AppCompatActivity {
     };
      */
 
-    private void storageUpload(){ // 이미지 부분 수정필요 현재 디비연결파트만 사용중
+//    private void storageUpload(){ // 이미지 부분 수정필요 현재 디비연결파트만 사용중
+//        final String title = ((EditText) findViewById(R.id.titleEditText)).getText().toString();
+//        final String contents = ((EditText) findViewById(R.id.contentsEditText)).getText().toString();
+//
+//        if(title.length() > 0 && contents.length() > 0){
+//            // if view loader needed, add here
+////            loaderLayout.setVisibility(View.VISIBLE);
+//
+//            String contentsList = "";
+//            user = FirebaseAuth.getInstance().getCurrentUser();
+//            //firebase storage
+//            FirebaseFirestore firebaseFirestore = FirebaseFirestore.getInstance();
+////            final DocumentReference documentReference = firebaseFirestore.collection("posts").document();
+//
+//            String id = getIntent().getStringExtra("id");
+//            DocumentReference dr;
+//            if(id == null){
+//                dr = firebaseFirestore.collection("posts").document();
+//            }else{
+//                dr = firebaseFirestore.collection("posts").document(id);
+//            }
+//            final DocumentReference documentReference = dr;
+//
+//
+//            // 이하 코드 추후 수정필요
+//            for(int i = 0; i< parent.getChildCount(); i++){
+//                LinearLayout linearLayout = (LinearLayout)parent.getChildAt(i);
+//                for (int ii = 0; ii < linearLayout.getChildCount(); ii++){
+//                    View view = linearLayout.getChildAt(ii);
+//                    if (view instanceof EditText){
+//                        String text = ((EditText)view).getText().toString();
+//                        if (text.length()>0){
+//                            contentsList = text;
+//                        }
+//                    } else { // image upload and storage linking needed
+//                        //contentsList.add(pathList).get(pathCount);
+//                    }
+//                }
+//            }
+//            // if pathList 가 없기때문에 그냥 써둠 현재 단일 포스트 동작완료
+//            PostInfo postInfo = new PostInfo(title, contentsList, user.getUid(), new Date());
+//            storeUpload(documentReference, postInfo);
+//        }
+//        else {startToast("다시입력해주세요.");
+//        }
+//    }
+
+    private void storageUpload() {
         final String title = ((EditText) findViewById(R.id.titleEditText)).getText().toString();
-        final String contents = ((EditText) findViewById(R.id.contentsEditText)).getText().toString();
 
-        if(title.length() > 0 && contents.length() > 0){
-            // if view loader needed, add here
-//            loaderLayout.setVisibility(View.VISIBLE);
-
+        if (title.length() > 0) {
+            //loaderLayout.setVisibility(View.VISIBLE);
             String contentsList = "";
             user = FirebaseAuth.getInstance().getCurrentUser();
-            //firebase storage
-            FirebaseFirestore firebaseFirestore = FirebaseFirestore.getInstance();
-            final DocumentReference documentReference = firebaseFirestore.collection("posts").document();
 
-            // 이하 코드 추후 수정필요
-            for(int i = 0; i< parent.getChildCount(); i++){
+            FirebaseFirestore firebaseFirestore = FirebaseFirestore.getInstance();
+            String id = getIntent().getStringExtra("id");
+            DocumentReference dr;
+            if(id == null){
+                dr = firebaseFirestore.collection("posts").document();
+            }else{
+                dr = firebaseFirestore.collection("posts").document(id);
+            }
+            final DocumentReference documentReference = dr;
+
+            for(int i = 0; i < parent.getChildCount(); i++){
                 LinearLayout linearLayout = (LinearLayout)parent.getChildAt(i);
-                for (int ii = 0; ii < linearLayout.getChildCount(); ii++){
+                for(int ii = 0; ii < linearLayout.getChildCount(); ii++){
                     View view = linearLayout.getChildAt(ii);
-                    if (view instanceof EditText){
+                    if(view instanceof EditText){
                         String text = ((EditText)view).getText().toString();
-                        if (text.length()>0){
+                        if(text.length() > 0){
                             contentsList = text;
                         }
-                    } else { // image upload and storage linking needed
-                        //contentsList.add(pathList).get(pathCount);
+                    } else {
+                        //image list
                     }
                 }
             }
-            // if pathList 가 없기때문에 그냥 써둠 현재 단일 포스트 동작완료
-            PostInfo postInfo = new PostInfo(title, contentsList, user.getUid(), new Date());
+            postInfo = new PostInfo(title, contentsList, user.getUid(), new Date());
             storeUpload(documentReference, postInfo);
-        }
-        else {startToast("다시입력해주세요.");
+        } else {
+            startToast("제목을 입력해주세요.");
         }
     }
+
     private void storeUpload(DocumentReference documentReference, PostInfo postInfo){
         documentReference.set(postInfo).addOnSuccessListener(new OnSuccessListener<Void>() {
             @Override
@@ -233,23 +293,13 @@ public class WritePostActivity extends AppCompatActivity {
 //                        loaderLayout.setVisibility(View.GONE);
                     }
                 });
-
-        /* FirebaseFirestore db = FirebaseFirestore.getInstance(); 기존방식
-        db.collection("posts").add(writeInfo)
-                .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
-                    @Override
-                    public void onSuccess(DocumentReference documentReference) {
-                        Log.d(TAG,"DocumentSnapshot written with ID:" + documentReference.getId());
-                    }
-            })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.w(TAG, "Error adding document", e);
-                    }
-                });            */
     }
     private void startToast(String msg){Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+    }
+    private void myStartActivity(Class c, String media, int requestCode) {
+        Intent intent = new Intent(this, c);
+        intent.putExtra("media", media);
+        startActivityForResult(intent, requestCode);
     }
 }
 
